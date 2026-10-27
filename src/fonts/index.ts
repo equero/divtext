@@ -31,7 +31,7 @@ export type {
 // Registry of available letter styles. Add new fonts here.
 export const FONTS: Font[] = [pixelFont, pixelBlockFont, pixelShadowFont, geoFont];
 
-export const DEFAULT_FONT = pixelFont;
+export const DEFAULT_FONT = pixelShadowFont;
 
 export function getFont(id: string): Font {
   return FONTS.find((font) => font.id === id) ?? DEFAULT_FONT;
