@@ -1,7 +1,7 @@
 import { inject } from "@vercel/analytics";
 
 import "@/input.css";
-import "@hbeneke/parley";
+import "@equerodev/parley";
 import "@/components/terminal-window";
 import "@/components/code-window";
 import "@/components/desktop-taskbar";

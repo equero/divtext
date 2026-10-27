@@ -1,6 +1,7 @@
 {
   "name": "divtext",
-  "version": "1.1.20",
+  "version": "1.1.21",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -14,7 +15,7 @@
     "vite": "^8.1.2"
   },
   "dependencies": {
-    "@hbeneke/parley": "^0.2.3",
+    "@equerodev/parley": "^0.2.5",
     "@vercel/analytics": "^2.0.1",
     "shiki": "^4.3.0"
   }
