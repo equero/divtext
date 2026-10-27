@@ -62,7 +62,8 @@ export interface Font {
   render(word: string, opts: RenderOptions): HTMLElement;
   /**
    * Stylesheet emitted alongside the markup in "css" mode. Omit for fonts
-   * that are inline-only (no shared classes).
+   * that are inline-only (no shared classes). Gets the word so rules for
+   * optional parts (line breaks) appear only when used.
    */
-  stylesheet?(opts: RenderOptions): string;
+  stylesheet?(opts: RenderOptions, word: string): string;
 }

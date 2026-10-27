@@ -58,7 +58,7 @@ export function exportParts(
   if (mode === "css" && font.stylesheet) {
     // CSS and HTML kept as separate blocks.
     return [
-      { title: "styles.css", lang: "css", code: font.stylesheet(opts) },
+      { title: "styles.css", lang: "css", code: font.stylesheet(opts, word) },
       { title: "index.html", lang: "html", code: markup },
     ];
   }

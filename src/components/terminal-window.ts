@@ -14,6 +14,7 @@ import {
   type WordStyle,
 } from "@/fonts";
 import { emit } from "@/events";
+import { oneLine } from "@/one-line";
 import { decorOf, writeState, type UrlState } from "@/url-state";
 import { BaseWindow } from "@/components/base-window";
 import { terminalBodyTemplate } from "@/components/terminal-window.template";
@@ -24,7 +25,7 @@ export class TerminalWindow extends BaseWindow {
   /** Optional seed from the URL, applied on first render. */
   seed: UrlState | null = null;
 
-  private input!: HTMLInputElement;
+  private input!: HTMLTextAreaElement;
   private output!: HTMLElement;
   private tools!: HTMLElement;
   private colorInput!: HTMLInputElement;
@@ -39,7 +40,7 @@ export class TerminalWindow extends BaseWindow {
   protected renderBody(host: HTMLElement): void {
     host.innerHTML = terminalBodyTemplate();
 
-    this.input = host.querySelector('[data-role="input"]') as HTMLInputElement;
+    this.input = host.querySelector('[data-role="input"]') as HTMLTextAreaElement;
     this.output = host.querySelector('[data-role="output"]') as HTMLElement;
     this.tools = host.querySelector('[data-role="tools"]') as HTMLElement;
 
@@ -52,14 +53,17 @@ export class TerminalWindow extends BaseWindow {
       this.input.focus();
     });
 
+    // Enter draws; Shift+Enter falls through and adds a line.
     this.input.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
+      if (e.key !== "Enter" || e.shiftKey) return;
       e.preventDefault();
       const text = this.input.value.trim();
       if (!text) return;
       this.render(text);
       this.input.value = "";
+      this.fitInput();
     });
+    this.input.addEventListener("input", () => this.fitInput());
 
     this.onAction("view-code", () => {
       if (this.currentWord) {
@@ -185,18 +189,24 @@ export class TerminalWindow extends BaseWindow {
     this.redraw(true);
   }
 
+  // Grow the prompt with its lines instead of scrolling inside it.
+  private fitInput(): void {
+    this.input.style.height = "auto";
+    this.input.style.height = `${this.input.scrollHeight}px`;
+  }
+
   override focusPrompt(): void {
     this.input.focus();
   }
 
   // Short label for the taskbar — the typed word, without the shell prefix.
   override get taskbarTitle(): string {
-    return this.currentWord || "~";
+    return oneLine(this.currentWord) || "~";
   }
 
   private render(text: string): void {
     this.currentWord = text;
-    this.setTitle(`user@divtext: ~/${text}`);
+    this.setTitle(`user@divtext: ~/${oneLine(text)}`);
     this.collapseIntro();
     this.tools.classList.remove("hidden");
     this.redraw(true);

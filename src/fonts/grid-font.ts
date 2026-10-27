@@ -1,6 +1,12 @@
 import { cssRule } from "@/fonts/format";
 import { GLYPHS } from "@/fonts/glyphs";
-import { inlineStyle, wordDecls as boxDecls } from "@/fonts/word-box";
+import {
+  breakRules,
+  inlineStyle,
+  makeBreak,
+  widestLine,
+  wordDecls as boxDecls,
+} from "@/fonts/word-box";
 import { SIDES } from "@/fonts/types";
 import type { Font, RenderOptions, Side } from "@/fonts/types";
 
@@ -127,13 +133,26 @@ export function createGridFont(spec: GridFontSpec): Font {
   });
 
   // Container declarations, shared by both class conventions and inline mode.
-  const wordDecls = (opts: RenderOptions): Record<string, string> =>
-    boxDecls(opts, letterGap);
+  const wordDecls = (opts: RenderOptions, word: string): Record<string, string> =>
+    boxDecls(
+      opts,
+      letterGap,
+      widestLine(word, letterGap, (char) => letterWidth(char, opts)),
+    );
+
+  // px width of what render() draws for a character (null: skipped).
+  const columnsWidth = (cols: number) => cols * cellWidth + (cols - 1) * gap;
+  function letterWidth(char: string, opts: RenderOptions): number | null {
+    const glyph = glyphs[char];
+    if (glyph) return columnsWidth(glyph[0].length);
+    if (char !== " ") return null;
+    return opts.mode === "css" && opts.style === "minimal" ? columnsWidth(emptyRows[0].length) : SPACE;
+  }
 
   // BEM: one class per role. Five classes, no structural coupling.
-  function bemStylesheet(opts: RenderOptions): string {
+  function bemStylesheet(opts: RenderOptions, word: string): string {
     return [
-      cssRule(`.${BEM.word}`, wordDecls(opts)),
+      cssRule(`.${BEM.word}`, wordDecls(opts, word)),
       cssRule(`.${BEM.letter}`, letterDecls),
       cssRule(`.${BEM.cell}`, shadow ? edgeCellSize : cellSize),
       cssRule(`.${BEM.cellOn}`, onDecls(opts.color)),
@@ -144,14 +163,15 @@ export function createGridFont(spec: GridFontSpec): Font {
             ...SIDES.map((side) => cssRule(`.${BEM.edge}--${side}`, edgeDecls(side, opts))),
           ]
         : []),
+      ...breakRules(opts, block, word),
     ].join("\n\n");
   }
 
   // Minimal: one container class + one modifier. Letters/cells matched by
   // structure; blank spaces are just empty letter grids (no extra class).
-  function minimalStylesheet(opts: RenderOptions): string {
+  function minimalStylesheet(opts: RenderOptions, word: string): string {
     return [
-      cssRule(`.${block}`, wordDecls(opts)),
+      cssRule(`.${block}`, wordDecls(opts, word)),
       cssRule(`.${block} > div`, letterDecls),
       cssRule(`.${block} > div > div`, cellSize),
       cssRule(`.${block} > div > div.${MIN_ON}`, onDecls(opts.color)),
@@ -169,11 +189,12 @@ export function createGridFont(spec: GridFontSpec): Font {
             ),
           ]
         : []),
+      ...breakRules(opts, block, word),
     ].join("\n\n");
   }
 
-  function stylesheet(opts: RenderOptions): string {
-    return opts.style === "minimal" ? minimalStylesheet(opts) : bemStylesheet(opts);
+  function stylesheet(opts: RenderOptions, word: string): string {
+    return opts.style === "minimal" ? minimalStylesheet(opts, word) : bemStylesheet(opts, word);
   }
 
   function makeCell(on: boolean, opts: RenderOptions): HTMLElement {
@@ -233,7 +254,7 @@ export function createGridFont(spec: GridFontSpec): Font {
   function render(word: string, opts: RenderOptions): HTMLElement {
     const line = document.createElement("div");
     if (opts.mode !== "css") {
-      line.style.cssText = inlineStyle(wordDecls(opts));
+      line.style.cssText = inlineStyle(wordDecls(opts, word));
     } else {
       line.className = block; // same container class for both conventions
     }
@@ -242,6 +263,8 @@ export function createGridFont(spec: GridFontSpec): Font {
       const glyph = glyphs[char];
       if (glyph) {
         line.appendChild(makeGlyph(glyph, opts));
+      } else if (char === "\n") {
+        line.appendChild(makeBreak(opts, block));
       } else if (char === " ") {
         if (opts.mode === "css" && opts.style === "minimal") {
           // A blank is an empty letter grid, so no dedicated class is needed.

@@ -9,6 +9,7 @@ import {
   type ExportMode,
 } from "@/fonts";
 import { BaseWindow } from "@/components/base-window";
+import { oneLine } from "@/one-line";
 
 // Separate window that shows the exported code for a snapshot of a word.
 export class CodeWindow extends BaseWindow {
@@ -24,7 +25,7 @@ export class CodeWindow extends BaseWindow {
   private codeSeq = 0;
 
   protected renderBody(host: HTMLElement): void {
-    this.setTitle(`code — ${this.word}`);
+    this.setTitle(`code — ${oneLine(this.word)}`);
     host.innerHTML = `
       <div class="px-5 py-4 flex flex-col gap-3 h-full min-h-0">
         <div data-role="mode" class="flex w-max rounded-md overflow-hidden border border-white/10 text-[13px]">
@@ -51,7 +52,7 @@ export class CodeWindow extends BaseWindow {
   }
 
   override get taskbarTitle(): string {
-    return `${this.word} · code`;
+    return `${oneLine(this.word)} · code`;
   }
 
   private async refreshCode(): Promise<void> {

@@ -10,11 +10,12 @@ export function terminalBodyTemplate(): string {
         <p class="whitespace-pre-wrap break-words"><span class="text-secondary select-none">$</span> divtext --run</p>
       </div>
 
-      <label class="flex items-center gap-2 mt-2 cursor-text whitespace-pre-wrap break-words">
+      <label class="flex items-start gap-2 mt-2 cursor-text whitespace-pre-wrap break-words">
         <span class="select-none shrink-0"><span class="text-primary font-bold">user@divtext</span><span class="text-fg">:</span><span class="text-secondary">~</span><span class="text-fg">$</span></span>
-        <input type="text" data-role="input"
-          class="flex-1 bg-transparent border-none outline-none text-fg font-[inherit] text-[inherit] caret-primary placeholder:text-muted"
-          placeholder="type a word and press enter" autocomplete="off" spellcheck="false">
+        <!-- A one-row textarea, so Shift+Enter can start a new line. -->
+        <textarea data-role="input" rows="1"
+          class="flex-1 resize-none overflow-hidden bg-transparent border-none outline-none text-fg font-[inherit] text-[inherit] leading-[inherit] caret-primary placeholder:text-muted"
+          placeholder="type a word and press enter (shift+enter: new line)" autocomplete="off" spellcheck="false"></textarea>
       </label>
 
       <div data-role="output" class="mt-[18px] min-h-[80px]"></div>
