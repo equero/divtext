@@ -5,6 +5,10 @@ import {
   FONTS,
   LINE_STYLES,
   SIDES,
+  MAX_SIZE,
+  MIN_SIZE,
+  SIZE_PRESETS,
+  VIEWS,
   getFont,
   renderWord,
   type Decor,
@@ -14,21 +18,34 @@ import {
   type WordStyle,
 } from "@/fonts";
 import { emit } from "@/events";
-import { decorOf, writeState, type UrlState } from "@/url-state";
+import { oneLine } from "@/one-line";
+import {
+  decorOf,
+  forgetDesign,
+  newDesignId,
+  saveDesign,
+  shareUrl,
+  type UrlState,
+} from "@/url-state";
 import { BaseWindow } from "@/components/base-window";
 import { terminalBodyTemplate } from "@/components/terminal-window.template";
 
 export class TerminalWindow extends BaseWindow {
   windowTitle = "user@divtext: ~";
 
-  /** Optional seed from the URL, applied on first render. */
+  /** Optional seed (shared link or saved design), applied on first render. */
   seed: UrlState | null = null;
 
-  private input!: HTMLInputElement;
+  /** Storage slot for this window's design; restored windows reuse theirs. */
+  designId = newDesignId();
+
+  private input!: HTMLTextAreaElement;
   private output!: HTMLElement;
   private tools!: HTMLElement;
   private colorInput!: HTMLInputElement;
   private lineStyleInput!: HTMLSelectElement;
+  private shadowStyleInput!: HTMLSelectElement;
+  private sizeInput!: HTMLInputElement;
   /** Absent while a single font is registered (the picker stays hidden). */
   private fontInput?: HTMLSelectElement;
   private currentWord = "";
@@ -39,7 +56,7 @@ export class TerminalWindow extends BaseWindow {
   protected renderBody(host: HTMLElement): void {
     host.innerHTML = terminalBodyTemplate();
 
-    this.input = host.querySelector('[data-role="input"]') as HTMLInputElement;
+    this.input = host.querySelector('[data-role="input"]') as HTMLTextAreaElement;
     this.output = host.querySelector('[data-role="output"]') as HTMLElement;
     this.tools = host.querySelector('[data-role="tools"]') as HTMLElement;
 
@@ -52,13 +69,23 @@ export class TerminalWindow extends BaseWindow {
       this.input.focus();
     });
 
+    // Enter draws; Shift+Enter falls through and adds a line.
     this.input.addEventListener("keydown", (e) => {
-      if (e.key !== "Enter") return;
+      if (e.key !== "Enter" || e.shiftKey) return;
       e.preventDefault();
       const text = this.input.value.trim();
       if (!text) return;
       this.render(text);
       this.input.value = "";
+      this.fitInput();
+    });
+    this.input.addEventListener("input", () => this.fitInput());
+
+    // Closing the window drops its design; other windows keep theirs.
+    this.addEventListener("wm:close", () => forgetDesign(this.designId));
+
+    this.onAction("share", (button) => {
+      if (this.currentWord) void this.share(button);
     });
 
     this.onAction("view-code", () => {
@@ -90,6 +117,9 @@ export class TerminalWindow extends BaseWindow {
     this.colorInput.value = seed.color;
     this.decor = decorOf(seed);
     this.lineStyleInput.value = this.decor.lineStyle;
+    this.shadowStyleInput.value = this.decor.shadowStyle;
+    this.showSize();
+    this.showShadowTool();
     if (this.fontInput) this.fontInput.value = this.font.id;
     this.highlightDecor();
     this.render(seed.word);
@@ -99,14 +129,21 @@ export class TerminalWindow extends BaseWindow {
     return { font: this.font, color: this.color, decor: this.decor };
   }
 
-  private syncUrl(): void {
-    if (!this.currentWord) return;
-    writeState({
-      word: this.currentWord,
-      fontId: this.font.id,
-      color: this.color,
-      ...this.decor,
-    });
+  private get design(): UrlState {
+    return { word: this.currentWord, fontId: this.font.id, color: this.color, ...this.decor };
+  }
+
+  private async share(button: HTMLElement): Promise<void> {
+    const url = shareUrl(this.design);
+    try {
+      await navigator.clipboard.writeText(url);
+      const original = button.textContent;
+      button.textContent = "Link copied!";
+      setTimeout(() => (button.textContent = original), 1200);
+    } catch {
+      // Clipboard blocked (e.g. insecure context): let the user copy it.
+      window.prompt("Copy this link to share your logo:", url);
+    }
   }
 
   /** Repaint the current word after a style change (no-op before one exists). */
@@ -114,7 +151,7 @@ export class TerminalWindow extends BaseWindow {
     if (!this.currentWord) return;
     this.output.replaceChildren(renderWord(this.currentWord, this.wordStyle));
     if (animate) this.animateCells();
-    this.syncUrl();
+    saveDesign(this.designId, this.design);
   }
 
   private buildDecorControls(host: HTMLElement): void {
@@ -136,17 +173,36 @@ export class TerminalWindow extends BaseWindow {
       sideRow.appendChild(button);
     }
 
-    this.lineStyleInput = host.querySelector('[data-role="line-style"]') as HTMLSelectElement;
-    for (const style of LINE_STYLES) {
-      const option = document.createElement("option");
-      option.value = style;
-      option.textContent = style;
-      this.lineStyleInput.appendChild(option);
-    }
-    this.lineStyleInput.value = this.decor.lineStyle;
-    this.lineStyleInput.addEventListener("change", () => {
-      this.decor = { ...this.decor, lineStyle: this.lineStyleInput.value as LineStyle };
+    this.lineStyleInput = this.buildStylePicker(host, "line-style", "lineStyle");
+    this.shadowStyleInput = this.buildStylePicker(host, "shadow-style", "shadowStyle");
+    this.showShadowTool();
+
+    // Any px value; the presets are only suggestions in the field's list.
+    this.sizeInput = host.querySelector('[data-role="size"]') as HTMLInputElement;
+    this.sizeInput.min = String(MIN_SIZE);
+    this.sizeInput.max = String(MAX_SIZE);
+    this.showSize();
+    this.sizeInput.addEventListener("change", () => {
+      const px = Math.round(this.sizeInput.valueAsNumber);
+      // Empty or the font's own height means "natural size" (no zoom exported).
+      const size =
+        Number.isNaN(px) || px === this.font.height ? 0 : Math.min(MAX_SIZE, Math.max(MIN_SIZE, px));
+      this.decor = { ...this.decor, size };
+      this.showSize();
       this.redraw();
+    });
+
+    const viewInput = host.querySelector('[data-role="view"]') as HTMLSelectElement;
+    for (const view of VIEWS) {
+      const option = document.createElement("option");
+      option.value = view;
+      option.textContent = `${view}%`;
+      viewInput.appendChild(option);
+    }
+    viewInput.value = "100";
+    viewInput.addEventListener("change", () => {
+      // On the output box, not the word: the export never sees it.
+      this.output.style.zoom = String(Number(viewInput.value) / 100);
     });
 
     this.highlightDecor();
@@ -179,10 +235,58 @@ export class TerminalWindow extends BaseWindow {
     this.fontInput = select;
   }
 
+  // One select per stroke: borders and the shadow outline style separately.
+  private buildStylePicker(
+    host: HTMLElement,
+    role: string,
+    field: "lineStyle" | "shadowStyle",
+  ): HTMLSelectElement {
+    const select = host.querySelector(`[data-role="${role}"]`) as HTMLSelectElement;
+    for (const style of LINE_STYLES) {
+      const option = document.createElement("option");
+      option.value = style;
+      option.textContent = style;
+      select.appendChild(option);
+    }
+    select.value = this.decor[field];
+    select.addEventListener("change", () => {
+      this.decor = { ...this.decor, [field]: select.value as LineStyle };
+      this.redraw();
+    });
+    return select;
+  }
+
+  // The shadow style only means something for fonts that draw a shadow.
+  private showShadowTool(): void {
+    this.querySelector('[data-role="shadow-tool"]')?.classList.toggle("hidden", !this.font.shadow);
+  }
+
+  // The size field reads as a font size: the letter height in px. Presets
+  // follow the current font, since each one has its own natural height.
+  private showSize(): void {
+    this.sizeInput.value = String(this.decor.size || this.font.height);
+    const presets = this.querySelector('[data-role="size-presets"]') as HTMLDataListElement;
+    presets.replaceChildren(
+      ...SIZE_PRESETS.map((factor) => {
+        const option = document.createElement("option");
+        option.value = String(Math.round(this.font.height * factor));
+        return option;
+      }),
+    );
+  }
+
   private setFont(font: Font): void {
     if (this.font === font) return;
     this.font = font;
+    this.showSize();
+    this.showShadowTool();
     this.redraw(true);
+  }
+
+  // Grow the prompt with its lines instead of scrolling inside it.
+  private fitInput(): void {
+    this.input.style.height = "auto";
+    this.input.style.height = `${this.input.scrollHeight}px`;
   }
 
   override focusPrompt(): void {
@@ -191,12 +295,12 @@ export class TerminalWindow extends BaseWindow {
 
   // Short label for the taskbar — the typed word, without the shell prefix.
   override get taskbarTitle(): string {
-    return this.currentWord || "~";
+    return oneLine(this.currentWord) || "~";
   }
 
   private render(text: string): void {
     this.currentWord = text;
-    this.setTitle(`user@divtext: ~/${text}`);
+    this.setTitle(`user@divtext: ~/${oneLine(text)}`);
     this.collapseIntro();
     this.tools.classList.remove("hidden");
     this.redraw(true);

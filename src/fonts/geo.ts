@@ -7,7 +7,7 @@ import {
   type GeoGlyph,
   type GeoPart,
 } from "@/fonts/geo-glyphs";
-import { inlineStyle, wordDecls } from "@/fonts/word-box";
+import { breakRules, inlineStyle, makeBreak, widestLine, wordDecls } from "@/fonts/word-box";
 import { SIDES } from "@/fonts/types";
 import type { Font, RenderOptions } from "@/fonts/types";
 
@@ -65,26 +65,34 @@ function partGeometry(part: GeoPart): Record<string, string> {
   return decls;
 }
 
-function bemStylesheet(opts: RenderOptions): string {
+// Word container, sized to the widest line when the word has several.
+function containerDecls(opts: RenderOptions, word: string): Record<string, string> {
+  const letterWidth = (char: string) => GEO_GLYPHS[char]?.w ?? (char === " " ? GEO_SPACE : null);
+  return wordDecls(opts, LETTER_GAP, GEO_H, widestLine(word, LETTER_GAP, letterWidth));
+}
+
+function bemStylesheet(opts: RenderOptions, word: string): string {
   return [
-    cssRule(`.${BEM.word}`, wordDecls(opts, LETTER_GAP)),
+    cssRule(`.${BEM.word}`, containerDecls(opts, word)),
     cssRule(`.${BEM.letter}`, letterDecls),
     cssRule(`.${BEM.part}`, partDecls(opts.color)),
     cssRule(`.${BEM.ring}`, ringDecls(opts.color)),
+    ...breakRules(opts, BLOCK, word),
   ].join("\n\n");
 }
 
-function minimalStylesheet(opts: RenderOptions): string {
+function minimalStylesheet(opts: RenderOptions, word: string): string {
   return [
-    cssRule(`.${BLOCK}`, wordDecls(opts, LETTER_GAP)),
+    cssRule(`.${BLOCK}`, containerDecls(opts, word)),
     cssRule(`.${BLOCK} > div`, letterDecls),
     cssRule(`.${BLOCK} > div > div`, partDecls(opts.color)),
     cssRule(`.${BLOCK} > div > div.${MIN_RING}`, ringDecls(opts.color)),
+    ...breakRules(opts, BLOCK, word),
   ].join("\n\n");
 }
 
-function stylesheet(opts: RenderOptions): string {
-  return opts.style === "minimal" ? minimalStylesheet(opts) : bemStylesheet(opts);
+function stylesheet(opts: RenderOptions, word: string): string {
+  return opts.style === "minimal" ? minimalStylesheet(opts, word) : bemStylesheet(opts, word);
 }
 
 function makePart(part: GeoPart, opts: RenderOptions): HTMLElement {
@@ -124,7 +132,7 @@ function makeLetter(glyph: GeoGlyph, opts: RenderOptions): HTMLElement {
 function render(word: string, opts: RenderOptions): HTMLElement {
   const line = document.createElement("div");
   if (opts.mode !== "css") {
-    line.style.cssText = inlineStyle(wordDecls(opts, LETTER_GAP));
+    line.style.cssText = inlineStyle(containerDecls(opts, word));
   } else {
     line.className = BLOCK; // same container class for both conventions
   }
@@ -132,6 +140,7 @@ function render(word: string, opts: RenderOptions): HTMLElement {
   for (const char of word.toUpperCase()) {
     const glyph = GEO_GLYPHS[char];
     if (glyph) line.appendChild(makeLetter(glyph, opts));
+    else if (char === "\n") line.appendChild(makeBreak(opts, BLOCK));
     // A blank is an empty letter box, so it needs no dedicated class.
     else if (char === " ") line.appendChild(makeLetter({ w: GEO_SPACE, parts: [] }, opts));
   }
@@ -141,6 +150,7 @@ function render(word: string, opts: RenderOptions): HTMLElement {
 export const geoFont: Font = {
   id: "geo",
   label: "Geometric",
+  height: GEO_H,
   render,
   stylesheet,
 };

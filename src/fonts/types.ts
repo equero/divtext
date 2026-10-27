@@ -7,7 +7,7 @@ export type CodeLang = "html" | "css";
 
 export const DEFAULT_COLOR = "#10b981";
 
-/** Stroke style shared by every decoration line (and future borders). */
+/** Stroke styles for the decoration borders and the shadow outline. */
 export const LINE_STYLES = ["solid", "dashed", "dotted", "double"] as const;
 export type LineStyle = (typeof LINE_STYLES)[number];
 
@@ -22,8 +22,24 @@ export type Side = (typeof SIDES)[number];
  * entry in the URL schema (src/url-state.ts).
  */
 export type Decor = Record<Side, boolean> & {
+  /** Stroke of the decoration borders. */
   lineStyle: LineStyle;
+  /** Stroke of the shadow outline, for fonts that draw one. */
+  shadowStyle: LineStyle;
+  /**
+   * Letter height in px, like a font size; 0 keeps the font's own height.
+   * Applied as `zoom` on the word container, so it scales every font.
+   */
+  size: number;
 };
+
+/** Suggested sizes, as multiples of a font's own height. */
+export const SIZE_PRESETS = [0.5, 1, 1.5, 2, 3] as const;
+export const MIN_SIZE = 8;
+export const MAX_SIZE = 1000;
+
+/** Preview zoom in percent. View only: never exported or shared. */
+export const VIEWS = ["50", "100", "200", "300"] as const;
 
 export const DEFAULT_DECOR: Decor = {
   top: false,
@@ -31,6 +47,8 @@ export const DEFAULT_DECOR: Decor = {
   bottom: false,
   left: false,
   lineStyle: "solid",
+  shadowStyle: "double",
+  size: 0,
 };
 
 export interface RenderOptions {
@@ -58,11 +76,16 @@ export interface Font {
   id: string;
   /** Human-readable name for pickers. */
   label: string;
+  /** px height of a letter at 100%: the "font size" the size picker shows. */
+  height: number;
+  /** True when the font draws a shadow outline (styled by decor.shadowStyle). */
+  shadow?: boolean;
   /** Build the DOM for a word with the given render options. */
   render(word: string, opts: RenderOptions): HTMLElement;
   /**
    * Stylesheet emitted alongside the markup in "css" mode. Omit for fonts
-   * that are inline-only (no shared classes).
+   * that are inline-only (no shared classes). Gets the word so rules for
+   * optional parts (line breaks) appear only when used.
    */
-  stylesheet?(opts: RenderOptions): string;
+  stylesheet?(opts: RenderOptions, word: string): string;
 }

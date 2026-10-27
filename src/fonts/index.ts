@@ -2,10 +2,20 @@ import { formatHtml } from "@/fonts/format";
 import { geoFont } from "@/fonts/geo";
 import { pixelBlockFont } from "@/fonts/pixel-block";
 import { pixelFont } from "@/fonts/pixel";
+import { pixelShadowFont } from "@/fonts/pixel-shadow";
 import { DEFAULT_COLOR, DEFAULT_DECOR } from "@/fonts/types";
 import type { CodePart, CssStyle, Decor, ExportMode, Font } from "@/fonts/types";
 
-export { DEFAULT_COLOR, DEFAULT_DECOR, LINE_STYLES, SIDES } from "@/fonts/types";
+export {
+  DEFAULT_COLOR,
+  DEFAULT_DECOR,
+  LINE_STYLES,
+  MAX_SIZE,
+  MIN_SIZE,
+  SIDES,
+  SIZE_PRESETS,
+  VIEWS,
+} from "@/fonts/types";
 export type {
   CodePart,
   CodeLang,
@@ -19,9 +29,9 @@ export type {
 } from "@/fonts/types";
 
 // Registry of available letter styles. Add new fonts here.
-export const FONTS: Font[] = [pixelFont, pixelBlockFont, geoFont];
+export const FONTS: Font[] = [pixelFont, pixelBlockFont, pixelShadowFont, geoFont];
 
-export const DEFAULT_FONT = pixelFont;
+export const DEFAULT_FONT = pixelShadowFont;
 
 export function getFont(id: string): Font {
   return FONTS.find((font) => font.id === id) ?? DEFAULT_FONT;
@@ -57,7 +67,7 @@ export function exportParts(
   if (mode === "css" && font.stylesheet) {
     // CSS and HTML kept as separate blocks.
     return [
-      { title: "styles.css", lang: "css", code: font.stylesheet(opts) },
+      { title: "styles.css", lang: "css", code: font.stylesheet(opts, word) },
       { title: "index.html", lang: "html", code: markup },
     ];
   }
