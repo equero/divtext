@@ -7,7 +7,7 @@ export type CodeLang = "html" | "css";
 
 export const DEFAULT_COLOR = "#10b981";
 
-/** Stroke style shared by every decoration line (and future borders). */
+/** Stroke styles for the decoration borders and the shadow outline. */
 export const LINE_STYLES = ["solid", "dashed", "dotted", "double"] as const;
 export type LineStyle = (typeof LINE_STYLES)[number];
 
@@ -22,7 +22,10 @@ export type Side = (typeof SIDES)[number];
  * entry in the URL schema (src/url-state.ts).
  */
 export type Decor = Record<Side, boolean> & {
+  /** Stroke of the decoration borders. */
   lineStyle: LineStyle;
+  /** Stroke of the shadow outline, for fonts that draw one. */
+  shadowStyle: LineStyle;
   /**
    * Letter height in px, like a font size; 0 keeps the font's own height.
    * Applied as `zoom` on the word container, so it scales every font.
@@ -44,6 +47,7 @@ export const DEFAULT_DECOR: Decor = {
   bottom: false,
   left: false,
   lineStyle: "solid",
+  shadowStyle: "double",
   size: 0,
 };
 
@@ -74,6 +78,8 @@ export interface Font {
   label: string;
   /** px height of a letter at 100%: the "font size" the size picker shows. */
   height: number;
+  /** True when the font draws a shadow outline (styled by decor.shadowStyle). */
+  shadow?: boolean;
   /** Build the DOM for a word with the given render options. */
   render(word: string, opts: RenderOptions): HTMLElement;
   /**

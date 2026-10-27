@@ -46,8 +46,14 @@ export function terminalBodyTemplate(): string {
         <div data-role="decor" class="flex rounded-md overflow-hidden border border-white/10 text-[13px]"></div>
         <!-- Not a <label>: it would forward the click and close the dropdown. -->
         <div class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] text-muted border border-white/10">
-          <span>Line</span>
-          <select data-role="line-style" aria-label="Line style"
+          <span>Border</span>
+          <select data-role="line-style" aria-label="Border line style"
+            class="bg-bar text-fg border-none outline-none text-[13px] cursor-pointer"></select>
+        </div>
+        <!-- Not a <label>: it would forward the click and close the dropdown. -->
+        <div data-role="shadow-tool" class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] text-muted border border-white/10">
+          <span>Shadow</span>
+          <select data-role="shadow-style" aria-label="Shadow line style"
             class="bg-bar text-fg border-none outline-none text-[13px] cursor-pointer"></select>
         </div>
         <label class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] text-muted border border-white/10 cursor-pointer">

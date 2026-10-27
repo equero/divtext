@@ -34,6 +34,7 @@ export class TerminalWindow extends BaseWindow {
   private tools!: HTMLElement;
   private colorInput!: HTMLInputElement;
   private lineStyleInput!: HTMLSelectElement;
+  private shadowStyleInput!: HTMLSelectElement;
   private sizeInput!: HTMLInputElement;
   /** Absent while a single font is registered (the picker stays hidden). */
   private fontInput?: HTMLSelectElement;
@@ -99,7 +100,9 @@ export class TerminalWindow extends BaseWindow {
     this.colorInput.value = seed.color;
     this.decor = decorOf(seed);
     this.lineStyleInput.value = this.decor.lineStyle;
+    this.shadowStyleInput.value = this.decor.shadowStyle;
     this.showSize();
+    this.showShadowTool();
     if (this.fontInput) this.fontInput.value = this.font.id;
     this.highlightDecor();
     this.render(seed.word);
@@ -146,18 +149,9 @@ export class TerminalWindow extends BaseWindow {
       sideRow.appendChild(button);
     }
 
-    this.lineStyleInput = host.querySelector('[data-role="line-style"]') as HTMLSelectElement;
-    for (const style of LINE_STYLES) {
-      const option = document.createElement("option");
-      option.value = style;
-      option.textContent = style;
-      this.lineStyleInput.appendChild(option);
-    }
-    this.lineStyleInput.value = this.decor.lineStyle;
-    this.lineStyleInput.addEventListener("change", () => {
-      this.decor = { ...this.decor, lineStyle: this.lineStyleInput.value as LineStyle };
-      this.redraw();
-    });
+    this.lineStyleInput = this.buildStylePicker(host, "line-style", "lineStyle");
+    this.shadowStyleInput = this.buildStylePicker(host, "shadow-style", "shadowStyle");
+    this.showShadowTool();
 
     // Any px value; the presets are only suggestions in the field's list.
     this.sizeInput = host.querySelector('[data-role="size"]') as HTMLInputElement;
@@ -217,6 +211,32 @@ export class TerminalWindow extends BaseWindow {
     this.fontInput = select;
   }
 
+  // One select per stroke: borders and the shadow outline style separately.
+  private buildStylePicker(
+    host: HTMLElement,
+    role: string,
+    field: "lineStyle" | "shadowStyle",
+  ): HTMLSelectElement {
+    const select = host.querySelector(`[data-role="${role}"]`) as HTMLSelectElement;
+    for (const style of LINE_STYLES) {
+      const option = document.createElement("option");
+      option.value = style;
+      option.textContent = style;
+      select.appendChild(option);
+    }
+    select.value = this.decor[field];
+    select.addEventListener("change", () => {
+      this.decor = { ...this.decor, [field]: select.value as LineStyle };
+      this.redraw();
+    });
+    return select;
+  }
+
+  // The shadow style only means something for fonts that draw a shadow.
+  private showShadowTool(): void {
+    this.querySelector('[data-role="shadow-tool"]')?.classList.toggle("hidden", !this.font.shadow);
+  }
+
   // The size field reads as a font size: the letter height in px. Presets
   // follow the current font, since each one has its own natural height.
   private showSize(): void {
@@ -235,6 +255,7 @@ export class TerminalWindow extends BaseWindow {
     if (this.font === font) return;
     this.font = font;
     this.showSize();
+    this.showShadowTool();
     this.redraw(true);
   }
 

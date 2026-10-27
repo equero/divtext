@@ -36,7 +36,7 @@ export interface GridFontSpec {
   radius: number;
   /**
    * Draw an outline of the glyph half a cell down-right, behind the cells,
-   * in the decor line style (ANSI Shadow look). Needs gap 0: the solid
+   * in the decor shadow style (ANSI Shadow look). Needs gap 0: the solid
    * cells are what hide the inner part of the outline.
    */
   shadow?: boolean;
@@ -123,7 +123,7 @@ export function createGridFont(spec: GridFontSpec): Font {
     "z-index": "-1",
   };
   const edgeDecls = (side: Side, opts: RenderOptions): Record<string, string> => ({
-    [`border-${side}`]: `${EDGE}px ${opts.decor.lineStyle} ${opts.color}`,
+    [`border-${side}`]: `${EDGE}px ${opts.decor.shadowStyle} ${opts.color}`,
   });
   const cellSize = { width: `${cellWidth}px`, height: `${cellHeight}px` };
   const edgeCellSize = { ...cellSize, "box-sizing": "border-box" };
@@ -282,5 +282,5 @@ export function createGridFont(spec: GridFontSpec): Font {
     return line;
   }
 
-  return { id: spec.id, label: spec.label, height, render, stylesheet };
+  return { id: spec.id, label: spec.label, height, shadow, render, stylesheet };
 }
