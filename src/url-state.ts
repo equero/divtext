@@ -2,13 +2,17 @@ import { DEFAULT_COLOR, DEFAULT_DECOR, LINE_STYLES, MAX_SIZE, MIN_SIZE, getFont 
 import type { Decor, LineStyle } from "@/fonts";
 
 /**
- * Shareable snapshot of a rendered word, mirrored in the query string so a
- * URL round-trips the terminal state
+ * Snapshot of a rendered word, encoded as query parameters
  * (?w=word&f=fontId&c=rrggbb&bt=1&br=1&bb=1&bl=1&ls=dashed&ss=solid&s=25).
+ *
+ * The same encoding serves two places: localStorage, which keeps one design
+ * per terminal window across reloads, and share links, which open as an
+ * extra window without touching the saved ones. The address bar itself is
+ * never updated while editing, so it stays clean.
  *
  * Every field is driven by one entry in SCHEMA below: to add a complement
  * (border, border style, background…) add the field here plus its spec there —
- * nothing else in the app touches the query string.
+ * nothing else in the app touches the encoding.
  */
 export interface UrlState extends Decor {
   word: string;
@@ -24,7 +28,7 @@ interface ParamSpec<T> {
   fallback: T;
   /** Parse an untrusted raw value; return null to fall back to the default. */
   parse(raw: string): T | null;
-  /** Render a value for the query string. */
+  /** Render a value as a parameter. */
   serialize(value: T): string;
 }
 
@@ -124,9 +128,16 @@ function spec(field: keyof UrlState): ParamSpec<unknown> {
   return SCHEMA[field] as ParamSpec<unknown>;
 }
 
-/** Read the current URL into a state, or null when no word is present. */
-export function readState(): UrlState | null {
-  const params = new URLSearchParams(location.search);
+const STORAGE_KEY = "divtext:designs";
+
+/** One saved design: the window slot it belongs to and its encoded state. */
+interface SavedDesign {
+  id: string;
+  params: string;
+}
+
+/** Parse parameters into a state, or null when no word is present. */
+function fromParams(params: URLSearchParams): UrlState | null {
   const state = {} as Record<keyof UrlState, unknown>;
   for (const field of FIELDS) {
     const { key, fallback, parse } = spec(field);
@@ -137,17 +148,86 @@ export function readState(): UrlState | null {
   return result.word ? result : null;
 }
 
-/** Mirror a state into the query string without adding history entries. */
-export function writeState(state: UrlState): void {
+/**
+ * Encode a state. Share links drop default values to stay short; storage
+ * keeps every field, so a saved design never shifts when a default changes.
+ */
+function toParams(state: UrlState, keepDefaults: boolean): URLSearchParams {
   const params = new URLSearchParams();
   for (const field of FIELDS) {
     const { key, fallback, serialize } = spec(field);
     const value = state[field];
-    // Defaults stay implicit so shared URLs carry only what was customised.
-    if (field !== "word" && value === fallback) continue;
+    if (!keepDefaults && field !== "word" && value === fallback) continue;
     params.set(key, serialize(value));
   }
-  history.replaceState(null, "", `${location.pathname}?${params}`);
+  return params;
+}
+
+// Storage can be blocked (private mode, disabled site data) or hold junk:
+// reads fall back to nothing, writes are skipped.
+function readSaved(): SavedDesign[] {
+  try {
+    const list: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]");
+    return Array.isArray(list)
+      ? list.filter(
+          (item): item is SavedDesign =>
+            typeof item?.id === "string" && typeof item?.params === "string",
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSaved(list: SavedDesign[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+  } catch {
+    // Storage blocked: designs just won't survive a reload.
+  }
+}
+
+/** A fresh slot id for a new terminal window. */
+export function newDesignId(): string {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+/** Designs saved in this browser, one per window, in the order they were made. */
+export function loadSavedDesigns(): Array<{ id: string; state: UrlState }> {
+  return readSaved().flatMap(({ id, params }) => {
+    const state = fromParams(new URLSearchParams(params));
+    return state ? [{ id, state }] : [];
+  });
+}
+
+/**
+ * The design in a shared link, if the page was opened from one. The address
+ * bar goes back to clean, so a reload doesn't open it a second time.
+ */
+export function takeSharedState(): UrlState | null {
+  const shared = fromParams(new URLSearchParams(location.search));
+  if (location.search) history.replaceState(null, "", location.pathname);
+  return shared;
+}
+
+/** Save a window's design in its own slot (added on first save). */
+export function saveDesign(id: string, state: UrlState): void {
+  const params = toParams(state, true).toString();
+  const list = readSaved();
+  const slot = list.find((item) => item.id === id);
+  if (slot) slot.params = params;
+  else list.push({ id, params });
+  writeSaved(list);
+}
+
+/** Drop a window's design, when the window is closed. */
+export function forgetDesign(id: string): void {
+  writeSaved(readSaved().filter((item) => item.id !== id));
+}
+
+/** A link that opens this exact design for anyone. */
+export function shareUrl(state: UrlState): string {
+  return `${location.origin}${location.pathname}?${toParams(state, false)}`;
 }
 
 /** The decoration slice of a state, ready to hand to a renderer. */

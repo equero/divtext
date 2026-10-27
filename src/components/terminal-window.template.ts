@@ -65,6 +65,10 @@ export function terminalBodyTemplate(): string {
           class="px-3 py-1 rounded-md text-[13px] bg-bar text-fg border border-white/10 hover:border-white/25 cursor-pointer">
           View code
         </button>
+        <button data-action="share" type="button" title="Copy a link that opens this logo"
+          class="px-3 py-1 rounded-md text-[13px] bg-bar text-fg border border-white/10 hover:border-white/25 cursor-pointer">
+          Share
+        </button>
       </div>
     </div>
   `;

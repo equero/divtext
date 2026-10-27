@@ -19,15 +19,25 @@ import {
 } from "@/fonts";
 import { emit } from "@/events";
 import { oneLine } from "@/one-line";
-import { decorOf, writeState, type UrlState } from "@/url-state";
+import {
+  decorOf,
+  forgetDesign,
+  newDesignId,
+  saveDesign,
+  shareUrl,
+  type UrlState,
+} from "@/url-state";
 import { BaseWindow } from "@/components/base-window";
 import { terminalBodyTemplate } from "@/components/terminal-window.template";
 
 export class TerminalWindow extends BaseWindow {
   windowTitle = "user@divtext: ~";
 
-  /** Optional seed from the URL, applied on first render. */
+  /** Optional seed (shared link or saved design), applied on first render. */
   seed: UrlState | null = null;
+
+  /** Storage slot for this window's design; restored windows reuse theirs. */
+  designId = newDesignId();
 
   private input!: HTMLTextAreaElement;
   private output!: HTMLElement;
@@ -71,6 +81,13 @@ export class TerminalWindow extends BaseWindow {
     });
     this.input.addEventListener("input", () => this.fitInput());
 
+    // Closing the window drops its design; other windows keep theirs.
+    this.addEventListener("wm:close", () => forgetDesign(this.designId));
+
+    this.onAction("share", (button) => {
+      if (this.currentWord) void this.share(button);
+    });
+
     this.onAction("view-code", () => {
       if (this.currentWord) {
         emit(this, "wm:code", {
@@ -112,14 +129,21 @@ export class TerminalWindow extends BaseWindow {
     return { font: this.font, color: this.color, decor: this.decor };
   }
 
-  private syncUrl(): void {
-    if (!this.currentWord) return;
-    writeState({
-      word: this.currentWord,
-      fontId: this.font.id,
-      color: this.color,
-      ...this.decor,
-    });
+  private get design(): UrlState {
+    return { word: this.currentWord, fontId: this.font.id, color: this.color, ...this.decor };
+  }
+
+  private async share(button: HTMLElement): Promise<void> {
+    const url = shareUrl(this.design);
+    try {
+      await navigator.clipboard.writeText(url);
+      const original = button.textContent;
+      button.textContent = "Link copied!";
+      setTimeout(() => (button.textContent = original), 1200);
+    } catch {
+      // Clipboard blocked (e.g. insecure context): let the user copy it.
+      window.prompt("Copy this link to share your logo:", url);
+    }
   }
 
   /** Repaint the current word after a style change (no-op before one exists). */
@@ -127,7 +151,7 @@ export class TerminalWindow extends BaseWindow {
     if (!this.currentWord) return;
     this.output.replaceChildren(renderWord(this.currentWord, this.wordStyle));
     if (animate) this.animateCells();
-    this.syncUrl();
+    saveDesign(this.designId, this.design);
   }
 
   private buildDecorControls(host: HTMLElement): void {

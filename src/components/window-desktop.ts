@@ -1,6 +1,6 @@
 import { clamp } from "@/clamp";
 import { emit, on, type WindowEventMap } from "@/events";
-import { readState } from "@/url-state";
+import { loadSavedDesigns, takeSharedState, type UrlState } from "@/url-state";
 import type { BaseWindow } from "@/components/base-window";
 import type { TerminalWindow } from "@/components/terminal-window";
 import type { CodeWindow } from "@/components/code-window";
@@ -33,7 +33,14 @@ export class WindowDesktop extends HTMLElement {
       on(document, "wm:spawn", () => this.spawn()),
       on(document, "wm:restore", (e) => this.restore(e.detail.id)),
     );
-    this.spawn();
+
+    // Reopen every saved design in its own window; a shared link comes on
+    // top as an extra one, leaving the saved designs untouched.
+    const saved = loadSavedDesigns();
+    const shared = takeSharedState();
+    for (const { id, state } of saved) this.spawn(state, id);
+    if (shared) this.spawn(shared);
+    if (saved.length === 0 && !shared) this.spawn();
   }
 
   disconnectedCallback(): void {
@@ -41,10 +48,11 @@ export class WindowDesktop extends HTMLElement {
     this.cleanups = [];
   }
 
-  private spawn(): void {
+  private spawn(seed: UrlState | null = null, designId?: string): void {
     const win = document.createElement("terminal-window") as TerminalWindow;
     win.windowId = ++this.idSeq;
-    if (this.idSeq === 1) win.seed = readState();
+    win.seed = seed;
+    if (designId) win.designId = designId;
 
     this.placeCascaded(win, WINDOW_WIDTH);
     win.focusPrompt();
