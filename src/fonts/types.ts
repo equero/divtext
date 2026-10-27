@@ -23,7 +23,20 @@ export type Side = (typeof SIDES)[number];
  */
 export type Decor = Record<Side, boolean> & {
   lineStyle: LineStyle;
+  /**
+   * Letter height in px, like a font size; 0 keeps the font's own height.
+   * Applied as `zoom` on the word container, so it scales every font.
+   */
+  size: number;
 };
+
+/** Suggested sizes, as multiples of a font's own height. */
+export const SIZE_PRESETS = [0.5, 1, 1.5, 2, 3] as const;
+export const MIN_SIZE = 8;
+export const MAX_SIZE = 1000;
+
+/** Preview zoom in percent. View only: never exported or shared. */
+export const VIEWS = ["50", "100", "200", "300"] as const;
 
 export const DEFAULT_DECOR: Decor = {
   top: false,
@@ -31,6 +44,7 @@ export const DEFAULT_DECOR: Decor = {
   bottom: false,
   left: false,
   lineStyle: "solid",
+  size: 0,
 };
 
 export interface RenderOptions {
@@ -58,6 +72,8 @@ export interface Font {
   id: string;
   /** Human-readable name for pickers. */
   label: string;
+  /** px height of a letter at 100%: the "font size" the size picker shows. */
+  height: number;
   /** Build the DOM for a word with the given render options. */
   render(word: string, opts: RenderOptions): HTMLElement;
   /**

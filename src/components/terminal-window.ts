@@ -5,6 +5,10 @@ import {
   FONTS,
   LINE_STYLES,
   SIDES,
+  MAX_SIZE,
+  MIN_SIZE,
+  SIZE_PRESETS,
+  VIEWS,
   getFont,
   renderWord,
   type Decor,
@@ -30,6 +34,7 @@ export class TerminalWindow extends BaseWindow {
   private tools!: HTMLElement;
   private colorInput!: HTMLInputElement;
   private lineStyleInput!: HTMLSelectElement;
+  private sizeInput!: HTMLInputElement;
   /** Absent while a single font is registered (the picker stays hidden). */
   private fontInput?: HTMLSelectElement;
   private currentWord = "";
@@ -94,6 +99,7 @@ export class TerminalWindow extends BaseWindow {
     this.colorInput.value = seed.color;
     this.decor = decorOf(seed);
     this.lineStyleInput.value = this.decor.lineStyle;
+    this.showSize();
     if (this.fontInput) this.fontInput.value = this.font.id;
     this.highlightDecor();
     this.render(seed.word);
@@ -153,6 +159,34 @@ export class TerminalWindow extends BaseWindow {
       this.redraw();
     });
 
+    // Any px value; the presets are only suggestions in the field's list.
+    this.sizeInput = host.querySelector('[data-role="size"]') as HTMLInputElement;
+    this.sizeInput.min = String(MIN_SIZE);
+    this.sizeInput.max = String(MAX_SIZE);
+    this.showSize();
+    this.sizeInput.addEventListener("change", () => {
+      const px = Math.round(this.sizeInput.valueAsNumber);
+      // Empty or the font's own height means "natural size" (no zoom exported).
+      const size =
+        Number.isNaN(px) || px === this.font.height ? 0 : Math.min(MAX_SIZE, Math.max(MIN_SIZE, px));
+      this.decor = { ...this.decor, size };
+      this.showSize();
+      this.redraw();
+    });
+
+    const viewInput = host.querySelector('[data-role="view"]') as HTMLSelectElement;
+    for (const view of VIEWS) {
+      const option = document.createElement("option");
+      option.value = view;
+      option.textContent = `${view}%`;
+      viewInput.appendChild(option);
+    }
+    viewInput.value = "100";
+    viewInput.addEventListener("change", () => {
+      // On the output box, not the word: the export never sees it.
+      this.output.style.zoom = String(Number(viewInput.value) / 100);
+    });
+
     this.highlightDecor();
   }
 
@@ -183,9 +217,24 @@ export class TerminalWindow extends BaseWindow {
     this.fontInput = select;
   }
 
+  // The size field reads as a font size: the letter height in px. Presets
+  // follow the current font, since each one has its own natural height.
+  private showSize(): void {
+    this.sizeInput.value = String(this.decor.size || this.font.height);
+    const presets = this.querySelector('[data-role="size-presets"]') as HTMLDataListElement;
+    presets.replaceChildren(
+      ...SIZE_PRESETS.map((factor) => {
+        const option = document.createElement("option");
+        option.value = String(Math.round(this.font.height * factor));
+        return option;
+      }),
+    );
+  }
+
   private setFont(font: Font): void {
     if (this.font === font) return;
     this.font = font;
+    this.showSize();
     this.redraw(true);
   }
 

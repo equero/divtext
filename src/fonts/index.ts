@@ -6,7 +6,16 @@ import { pixelShadowFont } from "@/fonts/pixel-shadow";
 import { DEFAULT_COLOR, DEFAULT_DECOR } from "@/fonts/types";
 import type { CodePart, CssStyle, Decor, ExportMode, Font } from "@/fonts/types";
 
-export { DEFAULT_COLOR, DEFAULT_DECOR, LINE_STYLES, SIDES } from "@/fonts/types";
+export {
+  DEFAULT_COLOR,
+  DEFAULT_DECOR,
+  LINE_STYLES,
+  MAX_SIZE,
+  MIN_SIZE,
+  SIDES,
+  SIZE_PRESETS,
+  VIEWS,
+} from "@/fonts/types";
 export type {
   CodePart,
   CodeLang,

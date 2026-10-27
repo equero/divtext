@@ -28,6 +28,21 @@ export function terminalBodyTemplate(): string {
           <select data-role="font" aria-label="Font"
             class="bg-bar text-fg border-none outline-none text-[13px] cursor-pointer"></select>
         </div>
+        <!-- Not a <label>: it would forward the click and close the dropdown. -->
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] text-muted border border-white/10">
+          <span>Size</span>
+          <input data-role="size" type="number" aria-label="Size in px" list="divtext-sizes"
+            class="w-14 bg-bar text-fg border-none outline-none text-[13px]">
+          <datalist id="divtext-sizes" data-role="size-presets"></datalist>
+          <span>px</span>
+        </div>
+        <!-- Not a <label>: it would forward the click and close the dropdown. -->
+        <div class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] text-muted border border-white/10"
+          title="Zoom the preview only; the exported code keeps its size">
+          <span>View</span>
+          <select data-role="view" aria-label="Preview zoom"
+            class="bg-bar text-fg border-none outline-none text-[13px] cursor-pointer"></select>
+        </div>
         <div data-role="decor" class="flex rounded-md overflow-hidden border border-white/10 text-[13px]"></div>
         <!-- Not a <label>: it would forward the click and close the dropdown. -->
         <div class="flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] text-muted border border-white/10">

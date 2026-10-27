@@ -1,10 +1,10 @@
-import { DEFAULT_COLOR, DEFAULT_DECOR, LINE_STYLES, getFont } from "@/fonts";
+import { DEFAULT_COLOR, DEFAULT_DECOR, LINE_STYLES, MAX_SIZE, MIN_SIZE, getFont } from "@/fonts";
 import type { Decor, LineStyle } from "@/fonts";
 
 /**
  * Shareable snapshot of a rendered word, mirrored in the query string so a
  * URL round-trips the terminal state
- * (?w=word&f=fontId&c=rrggbb&bt=1&br=1&bb=1&bl=1&ls=dashed).
+ * (?w=word&f=fontId&c=rrggbb&bt=1&br=1&bb=1&bl=1&ls=dashed&s=25).
  *
  * Every field is driven by one entry in SCHEMA below: to add a complement
  * (border, border style, background…) add the field here plus its spec there —
@@ -80,6 +80,19 @@ function choice<T extends string>(
   };
 }
 
+/** A whole number within a range; anything else falls back. */
+function integer(key: string, min: number, max: number, fallback: number): ParamSpec<number> {
+  return {
+    key,
+    fallback,
+    parse: (raw) => {
+      const value = Number(raw);
+      return Number.isInteger(value) && value >= min && value <= max ? value : null;
+    },
+    serialize: (value) => String(value),
+  };
+}
+
 /** A registered font id; unknown ids fall back to the default font. */
 function fontId(key: string): ParamSpec<string> {
   return {
@@ -101,6 +114,7 @@ const SCHEMA: Schema = {
   bottom: flag("bb", DEFAULT_DECOR.bottom),
   left: flag("bl", DEFAULT_DECOR.left),
   lineStyle: choice<LineStyle>("ls", LINE_STYLES, DEFAULT_DECOR.lineStyle),
+  size: integer("s", MIN_SIZE, MAX_SIZE, DEFAULT_DECOR.size),
 };
 
 const FIELDS = Object.keys(SCHEMA) as Array<keyof UrlState>;
@@ -143,5 +157,6 @@ export function decorOf(state: UrlState): Decor {
     bottom: state.bottom,
     left: state.left,
     lineStyle: state.lineStyle,
+    size: state.size,
   };
 }

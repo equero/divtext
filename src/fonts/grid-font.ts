@@ -84,6 +84,7 @@ export function createGridFont(spec: GridFontSpec): Font {
     shadow = false,
   } = spec;
   const rowCount = glyphs.A.length;
+  const height = rowCount * cellHeight + (rowCount - 1) * gap;
   // A blank in minimal mode is an empty letter as wide as "A".
   const emptyRows = Array.from({ length: rowCount }, () => ".".repeat(glyphs.A[0].length));
 
@@ -137,6 +138,7 @@ export function createGridFont(spec: GridFontSpec): Font {
     boxDecls(
       opts,
       letterGap,
+      height,
       widestLine(word, letterGap, (char) => letterWidth(char, opts)),
     );
 
@@ -280,5 +282,5 @@ export function createGridFont(spec: GridFontSpec): Font {
     return line;
   }
 
-  return { id: spec.id, label: spec.label, render, stylesheet };
+  return { id: spec.id, label: spec.label, height, render, stylesheet };
 }

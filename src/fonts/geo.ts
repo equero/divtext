@@ -68,7 +68,7 @@ function partGeometry(part: GeoPart): Record<string, string> {
 // Word container, sized to the widest line when the word has several.
 function containerDecls(opts: RenderOptions, word: string): Record<string, string> {
   const letterWidth = (char: string) => GEO_GLYPHS[char]?.w ?? (char === " " ? GEO_SPACE : null);
-  return wordDecls(opts, LETTER_GAP, widestLine(word, LETTER_GAP, letterWidth));
+  return wordDecls(opts, LETTER_GAP, GEO_H, widestLine(word, LETTER_GAP, letterWidth));
 }
 
 function bemStylesheet(opts: RenderOptions, word: string): string {
@@ -150,6 +150,7 @@ function render(word: string, opts: RenderOptions): HTMLElement {
 export const geoFont: Font = {
   id: "geo",
   label: "Geometric",
+  height: GEO_H,
   render,
   stylesheet,
 };

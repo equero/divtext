@@ -8,12 +8,14 @@ export const LINE_GAP = 8; // px between the word and a decoration line
 /**
  * Declarations for the word container: a wrapping row of letters plus the
  * optional decoration borders. Shared by every font so decor behaves the
- * same regardless of how the letters themselves are drawn. `lineWidth` is
+ * same regardless of how the letters themselves are drawn. `height` is the
+ * font's own letter height, which a custom size scales from; `lineWidth` is
  * the widest line of a multi-line word (see widestLine).
  */
 export function wordDecls(
   opts: RenderOptions,
   letterGap: number,
+  height: number,
   lineWidth?: number,
 ): Record<string, string> {
   const decor = opts.decor;
@@ -23,6 +25,9 @@ export function wordDecls(
     gap: `${letterGap}px`,
     "flex-wrap": "wrap",
   };
+  if (decor.size > 0 && decor.size !== height) {
+    decls.zoom = String(Math.round((decor.size / height) * 1000) / 1000);
+  }
   const sides = SIDES.filter((side) => decor[side]);
   if (sides.length === 0) return decls;
 
