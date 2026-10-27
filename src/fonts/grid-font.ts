@@ -1,12 +1,12 @@
 import { cssRule } from "@/fonts/format";
-import { GLYPHS, GLYPH_COLS as COLS, GLYPH_ROWS as ROWS } from "@/fonts/glyphs";
+import { GLYPHS } from "@/fonts/glyphs";
 import { inlineStyle, wordDecls as boxDecls } from "@/fonts/word-box";
 import type { Font, RenderOptions } from "@/fonts/types";
 
-const CELL = 8; // px per cell
+const CELL = 8; // px per cell, unless the spec sets its own size
 const SPACE = 24; // px width of a blank space
 
-/** What separates one grid font from another: spacing and cell shape. */
+/** What separates one grid font from another: glyphs, spacing and cell shape. */
 export interface GridFontSpec {
   /** Stable id used in URLs / storage. */
   id: string;
@@ -14,6 +14,11 @@ export interface GridFontSpec {
   label: string;
   /** CSS block name, root of the BEM class names. */
   block: string;
+  /** Glyph matrices ("#" lit, "." empty); all the same height. Default: GLYPHS. */
+  glyphs?: Record<string, string[]>;
+  /** px size of a cell. Default: 8 × 8. */
+  cellWidth?: number;
+  cellHeight?: number;
   /** px between cells; 0 welds the cells into solid strokes. */
   gap: number;
   /** px between letters. */
@@ -25,11 +30,32 @@ export interface GridFontSpec {
 // Minimal convention: only two classes; everything else is structural.
 const MIN_ON = "on";
 
-const EMPTY_ROWS = Array.from({ length: ROWS }, () => ".".repeat(COLS));
+/**
+ * Visit a glyph column by column. Letters fill their grid in this order
+ * (grid-auto-flow: column), so each glyph takes its own width without any
+ * per-letter CSS.
+ */
+function forEachCell(rows: string[], visit: (r: number, c: number) => void): void {
+  for (let c = 0; c < rows[0].length; c++) {
+    for (let r = 0; r < rows.length; r++) visit(r, c);
+  }
+}
 
-/** Build a grid font (fixed glyph matrix) from its spacing spec. */
+/** Build a grid font (glyph matrices) from its spec. */
 export function createGridFont(spec: GridFontSpec): Font {
-  const { block, gap, letterGap, radius } = spec;
+  const {
+    block,
+    glyphs = GLYPHS,
+    cellWidth = CELL,
+    cellHeight = CELL,
+    gap,
+    letterGap,
+    radius,
+  } = spec;
+  const rowCount = glyphs.A.length;
+  // A blank in minimal mode is an empty letter as wide as "A".
+  const emptyRows = Array.from({ length: rowCount }, () => ".".repeat(glyphs.A[0].length));
+
   // BEM class names.
   const BEM = {
     word: block,
@@ -39,23 +65,25 @@ export function createGridFont(spec: GridFontSpec): Font {
     space: `${block}__space`,
   };
 
-  const letterDecls: Record<string, string> = {
+  const gridDecls: Record<string, string> = {
     display: "grid",
-    "grid-template-columns": `repeat(${COLS}, ${CELL}px)`,
+    "grid-template-rows": `repeat(${rowCount}, ${cellHeight}px)`,
+    "grid-auto-flow": "column",
+    "grid-auto-columns": `${cellWidth}px`,
     ...(gap > 0 ? { gap: `${gap}px` } : {}),
+  };
+  const letterDecls: Record<string, string> = {
+    ...gridDecls,
     flex: "0 0 auto",
   };
-  const letterInline =
-    `display:grid;grid-template-columns:repeat(${COLS},${CELL}px);` +
-    (gap > 0 ? `gap:${gap}px;` : "") +
-    "flex:0 0 auto";
+  const letterInline = inlineStyle(letterDecls).replaceAll(", ", ",");
+
+  const cellSize = { width: `${cellWidth}px`, height: `${cellHeight}px` };
 
   const onDecls = (color: string): Record<string, string> => ({
     background: color,
     ...(radius > 0 ? { "border-radius": `${radius}px` } : {}),
   });
-  const onInline = (color: string): string =>
-    `background:${color}` + (radius > 0 ? `;border-radius:${radius}px` : "");
 
   // Container declarations, shared by both class conventions and inline mode.
   const wordDecls = (opts: RenderOptions): Record<string, string> =>
@@ -66,7 +94,7 @@ export function createGridFont(spec: GridFontSpec): Font {
     return [
       cssRule(`.${BEM.word}`, wordDecls(opts)),
       cssRule(`.${BEM.letter}`, letterDecls),
-      cssRule(`.${BEM.cell}`, { width: `${CELL}px`, height: `${CELL}px` }),
+      cssRule(`.${BEM.cell}`, cellSize),
       cssRule(`.${BEM.cellOn}`, onDecls(opts.color)),
       cssRule(`.${BEM.space}`, { width: `${SPACE}px`, flex: "0 0 auto" }),
     ].join("\n\n");
@@ -78,7 +106,7 @@ export function createGridFont(spec: GridFontSpec): Font {
     return [
       cssRule(`.${block}`, wordDecls(opts)),
       cssRule(`.${block} > div`, letterDecls),
-      cssRule(`.${block} > div > div`, { width: `${CELL}px`, height: `${CELL}px` }),
+      cssRule(`.${block} > div > div`, cellSize),
       cssRule(`.${block} > div > div.${MIN_ON}`, onDecls(opts.color)),
     ].join("\n\n");
   }
@@ -90,8 +118,7 @@ export function createGridFont(spec: GridFontSpec): Font {
   function makeCell(on: boolean, opts: RenderOptions): HTMLElement {
     const dot = document.createElement("div");
     if (opts.mode !== "css") {
-      dot.style.cssText =
-        `width:${CELL}px;height:${CELL}px` + (on ? `;${onInline(opts.color)}` : "");
+      dot.style.cssText = inlineStyle({ ...cellSize, ...(on ? onDecls(opts.color) : {}) });
     } else if (opts.style === "minimal") {
       if (on) dot.className = MIN_ON;
     } else {
@@ -107,11 +134,7 @@ export function createGridFont(spec: GridFontSpec): Font {
     } else if (opts.style === "bem") {
       letter.className = BEM.letter;
     }
-    for (const row of rows) {
-      for (const cell of row) {
-        letter.appendChild(makeCell(cell === "#", opts));
-      }
-    }
+    forEachCell(rows, (r, c) => letter.appendChild(makeCell(rows[r][c] === "#", opts)));
     return letter;
   }
 
@@ -124,13 +147,13 @@ export function createGridFont(spec: GridFontSpec): Font {
     }
 
     for (const char of word.toUpperCase()) {
-      const glyph = GLYPHS[char];
+      const glyph = glyphs[char];
       if (glyph) {
         line.appendChild(makeGlyph(glyph, opts));
       } else if (char === " ") {
         if (opts.mode === "css" && opts.style === "minimal") {
           // A blank is an empty letter grid, so no dedicated class is needed.
-          line.appendChild(makeGlyph(EMPTY_ROWS, opts));
+          line.appendChild(makeGlyph(emptyRows, opts));
         } else {
           const space = document.createElement("div");
           if (opts.mode === "css") space.className = BEM.space;
