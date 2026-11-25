@@ -1,6 +1,7 @@
 {
   "name": "divtext",
   "version": "1.3.0",
+  "author": "Enrique Quero <equero@pm.me> (https://equero.dev)",
   "type": "module",
   "scripts": {
     "dev": "vite",
